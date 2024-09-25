@@ -3,7 +3,7 @@ import pandas as pd
 import yfinance as yf
 import plotly.graph_objs as go
 import numpy as np
-
+from scipy.stats import linregress
 
 def download_and_process_data(ticker: str):
     data = yf.download(ticker, start="2019-04-01", end="2025-03-31", interval="1d")
@@ -64,7 +64,7 @@ st.sidebar.title('Stock Analysis Dashboard')
 
 analysis_option = st.sidebar.radio(
     'Select Analysis Type',
-    ('Weekly Candlestick Chart', 'Hourly Candlestick Chart', 'Yearly Candlestick Chart')
+    ('Weekly Candlestick Chart', 'Hourly Candlestick Chart', 'Yearly Candlestick Chart','Stock Beta and Percentage Change','yearly Stock Beta and Percentage Change')
 )
 
 
@@ -214,3 +214,178 @@ elif analysis_option == 'Yearly Candlestick Chart':
 
     fig = create_plot(filtered_data, title)
     st.plotly_chart(fig)
+
+elif analysis_option == 'Stock Beta and Percentage Change':
+    
+    stock_tickers = ['AARTIIND.NS', 'ABB.NS', 'ABBOTINDIA.NS', 'ABCAPITAL.NS', 'ABFRL.NS', 'ACC.NS', 'ADANIENT.NS',
+                 'ADANIPORTS.NS', 'AMBUJACEM.NS', 'APOLLOHOSP.NS', 'APOLLOTYRE.NS', 'ASHOKLEY.NS', 'ASTRAL.NS',
+                 'ATUL.NS', 'AUBANK.NS', 'AUROPHARMA.NS', 'BAJAJFINSV.NS', 'BAJFINANCE.NS', 'BALKRISIND.NS',
+                 'BALRAMCHIN.NS', 'BANDHANBNK.NS', 'BANKBARODA.NS', 'BEL.NS', 'BHARATFORG.NS', 'BHARTIARTL.NS',
+                 'BHEL.NS', 'BIOCON.NS', 'BOSCHLTD.NS', 'BPCL.NS', 'BRITANNIA.NS', 'BSOFT.NS', 'CANBK.NS',
+                 'CHAMBLFERT.NS', 'CHOLAFIN.NS', 'CIPLA.NS', 'COALINDIA.NS', 'COFORGE.NS', 'CONCOR.NS',
+                 'COROMANDEL.NS', 'CROMPTON.NS', 'CUB.NS', 'DABUR.NS', 'DALBHARAT.NS', 'DEEPAKNTR.NS', 'DLF.NS',
+                 'EICHERMOT.NS', 'ESCORTS.NS', 'GAIL.NS', 'GLENMARK.NS', 'GMRINFRA.NS', 'GNFC.NS', 'GODREJCP.NS',
+                 'GODREJPROP.NS', 'GRASIM.NS', 'GUJGASLTD.NS', 'HAL.NS', 'HDFCBANK.NS', 'HDFCLIFE.NS',
+                 'HEROMOTOCO.NS', 'HINDPETRO.NS', 'HINDUNILVR.NS', 'ICICIBANK.NS', 'ICICIGI.NS', 'ICICIPRULI.NS',
+                 'IDEA.NS', 'IDFC.NS', 'IDFCFIRSTB.NS', 'IEX.NS', 'INDHOTEL.NS', 'INDIACEM.NS', 'INDIAMART.NS',
+                 'INDIGO.NS', 'INDUSINDBK.NS', 'INDUSTOWER.NS', 'IOC.NS', 'IPCALAB.NS', 'IRCTC.NS', 'ITC.NS',
+                 'JINDALSTEL.NS', 'JKCEMENT.NS', 'JSWSTEEL.NS', 'JUBLFOOD.NS', 'KOTAKBANK.NS', 'LICHSGFIN.NS',
+                 'LT.NS', 'LTF.NS', 'LTTS.NS', 'M&MFIN.NS', 'MANAPPURAM.NS', 'MARICO.NS', 'MARUTI.NS', 'MCX.NS',
+                 'METROPOLIS.NS', 'MFSL.NS', 'MGL.NS', 'MOTHERSON.NS', 'MPHASIS.NS', 'NATIONALUM.NS', 'NAVINFLUOR.NS',
+                 'NESTLEIND.NS', 'NMDC.NS', 'NTPC.NS', 'OBEROIRLTY.NS', 'ONGC.NS', 'PEL.NS', 'PETRONET.NS', 'PFC.NS',
+                 'PIDILITIND.NS', 'PIIND.NS', 'PNB.NS', 'POLYCAB.NS', 'POWERGRID.NS', 'PVRINOX.NS', 'RAMCOCEM.NS',
+                 'RBLBANK.NS', 'RECLTD.NS', 'RELIANCE.NS', 'SAIL.NS', 'SBICARD.NS', 'SBILIFE.NS', 'SBIN.NS',
+                 'SHRIRAMFIN.NS', 'SRF.NS', 'SUNTV.NS', 'TATACHEM.NS', 'TATACOMM.NS', 'TATACONSUM.NS', 'TATAMOTORS.NS',
+                 'TATAPOWER.NS', 'TATASTEEL.NS', 'TCS.NS', 'TORNTPHARM.NS', 'UBL.NS', 'ULTRACEMCO.NS', 'UPL.NS',
+                 'VEDL.NS', 'VOLTAS.NS', 'ZYDUSLIFE.NS']
+
+    market_ticker = '^NSEI'
+
+    st.title("Stock Beta and Percentage Change")
+    
+    
+    time_interval = st.sidebar.selectbox("Select Time Interval", ["Daily", "Weekly", "Monthly", "3 Months"])
+
+
+    selected_stock = st.sidebar.selectbox("Select Stock", stock_tickers)
+    start_date = st.sidebar.date_input("Start Date", value=pd.to_datetime("2023-01-01"))
+    end_date = st.sidebar.date_input("End Date", value=pd.to_datetime("2023-12-31"))
+   
+
+    st.write(f"Fetching data for {selected_stock} from {start_date} to {end_date}...")
+
+    @st.cache_data(ttl=3600)  
+    def fetch_stock_data(ticker, start, end, interval='1d'):
+        return yf.download(ticker, start=start, end=end, interval=interval)['Adj Close']
+
+    try:
+        
+        if time_interval == "Daily":
+            stock_data = fetch_stock_data(selected_stock, start_date, end_date, interval='1d')
+            market_data = fetch_stock_data(market_ticker, start_date, end_date, interval='1d')
+            interval_label = 'Daily Percent Change'
+            interval_data = stock_data.pct_change(fill_method=None) * 100
+
+        elif time_interval == "Weekly":
+            stock_data = fetch_stock_data(selected_stock, start_date, end_date, interval='1wk')
+            market_data = fetch_stock_data(market_ticker, start_date, end_date, interval='1wk')
+            interval_label = 'Weekly Percent Change'
+            interval_data = stock_data.pct_change(fill_method=None) * 100
+
+        elif time_interval == "Monthly":
+            stock_data = fetch_stock_data(selected_stock, start_date, end_date, interval='1mo')
+            market_data = fetch_stock_data(market_ticker, start_date, end_date, interval='1mo')
+            interval_label = 'Monthly Percent Change'
+            interval_data = stock_data.pct_change(fill_method=None) * 100
+
+        elif time_interval == "3 Months":
+            stock_data = fetch_stock_data(selected_stock, start_date, end_date, interval='3mo')
+            market_data = fetch_stock_data(market_ticker, start_date, end_date, interval='3mo')
+            interval_label = '3-Month Percent Change'
+            interval_data = stock_data.pct_change(fill_method=None) * 100
+            
+        if stock_data.empty or market_data.empty:
+            st.error("No data found for the selected date range. Please adjust the date range.")
+            st.stop()
+
+   
+        market_returns = market_data.pct_change(fill_method=None) * 100
+        covariance = (interval_data - interval_data.mean()) * (market_returns - market_returns.mean())
+        variance = market_returns.var()
+        beta = covariance / variance if variance != 0 else np.nan
+
+        result_df = pd.DataFrame({
+            'Date': stock_data.index,
+            'Stock': selected_stock,
+            interval_label: interval_data.values,
+            'Beta': beta.values
+        })
+
+        st.write(f"Displaying {time_interval.lower()} data for {selected_stock}:")
+        st.write(result_df)
+
+    except Exception as e:
+        st.error(f"An error occurred: {str(e)}")
+        
+if analysis_option == 'yearly Stock Beta and Percentage Change':
+
+    stock_tickers = [
+        'AARTIIND.NS', 'ABB.NS', 'ABBOTINDIA.NS', 'ABCAPITAL.NS', 'ABFRL.NS', 'ACC.NS',
+        'ADANIENT.NS', 'ADANIPORTS.NS', 'AMBUJACEM.NS', 'APOLLOHOSP.NS', 'APOLLOTYRE.NS',
+        'ASHOKLEY.NS', 'ASTRAL.NS', 'ATUL.NS', 'AUBANK.NS', 'AUROPHARMA.NS', 'BAJAJFINSV.NS',
+        'BAJFINANCE.NS', 'BALKRISIND.NS', 'BALRAMCHIN.NS', 'BANDHANBNK.NS', 'BANKBARODA.NS',
+        '^NSEBANK', 'BEL.NS', 'BHARATFORG.NS', 'BHARTIARTL.NS', 'BHEL.NS', 'BIOCON.NS',
+        'BOSCHLTD.NS', 'BPCL.NS', 'BRITANNIA.NS', 'BSOFT.NS', 'CANBK.NS', 'CHAMBLFERT.NS',
+        'CHOLAFIN.NS', 'CIPLA.NS', 'COALINDIA.NS', 'COFORGE.NS', 'CONCOR.NS', 'COROMANDEL.NS',
+        'CROMPTON.NS', 'CUB.NS', 'DABUR.NS', 'DALBHARAT.NS', 'DEEPAKNTR.NS', 'DLF.NS',
+        'EICHERMOT.NS', 'ESCORTS.NS', 'GAIL.NS', 'GLENMARK.NS', 'GMRINFRA.NS', 'GNFC.NS',
+        'GODREJCP.NS', 'GODREJPROP.NS', 'GRASIM.NS', 'GUJGASLTD.NS', 'HAL.NS', 'HDFCBANK.NS',
+        'HDFCLIFE.NS', 'HEROMOTOCO.NS', 'HINDPETRO.NS', 'HINDUNILVR.NS', 'ICICIBANK.NS',
+        'ICICIGI.NS', 'ICICIPRULI.NS', 'IDEA.NS', 'IDFC.NS', 'IDFCFIRSTB.NS', 'IEX.NS',
+        'INDHOTEL.NS', 'INDIACEM.NS', 'INDIAMART.NS', 'INDIGO.NS', 'INDUSINDBK.NS',
+        'INDUSTOWER.NS', 'IOC.NS', 'IPCALAB.NS', 'IRCTC.NS', 'ITC.NS', 'JINDALSTEL.NS',
+        'JKCEMENT.NS', 'JSWSTEEL.NS', 'JUBLFOOD.NS', 'KOTAKBANK.NS', 'LICHSGFIN.NS',
+        'LT.NS', 'LTF.NS', 'LTTS.NS', 'M&MFIN.NS', 'MANAPPURAM.NS', 'MARICO.NS',
+        'MARUTI.NS', 'MCX.NS', 'METROPOLIS.NS', 'MFSL.NS', 'MGL.NS', 'MOTHERSON.NS',
+        'MPHASIS.NS', 'NATIONALUM.NS', 'NAVINFLUOR.NS', 'NESTLEIND.NS', 'NMDC.NS',
+        'NTPC.NS', 'OBEROIRLTY.NS', 'ONGC.NS', 'PEL.NS', 'PETRONET.NS', 'PFC.NS',
+        'PIDILITIND.NS', 'PIIND.NS', 'PNB.NS', 'POLYCAB.NS', 'POWERGRID.NS', 'PVRINOX.NS',
+        'RAMCOCEM.NS', 'RBLBANK.NS', 'RECLTD.NS', 'RELIANCE.NS', 'SAIL.NS', 'SBICARD.NS',
+        'SBILIFE.NS', 'SBIN.NS', 'SHRIRAMFIN.NS', 'SRF.NS', 'SUNTV.NS', 'TATACHEM.NS',
+        'TATACOMM.NS', 'TATACONSUM.NS', 'TATAMOTORS.NS', 'TATAPOWER.NS', 'TATASTEEL.NS',
+        'TCS.NS', 'TORNTPHARM.NS', 'UBL.NS', 'ULTRACEMCO.NS', 'UPL.NS', 'VEDL.NS',
+        'VOLTAS.NS', 'ZYDUSLIFE.NS'
+    ]
+
+
+    market_ticker = '^NSEI'  
+
+    st.title("Stock Beta and Yearly Percentage Change")
+
+
+    selected_stocks = st.sidebar.multiselect("Select Stocks", stock_tickers)
+    start_date = st.sidebar.date_input("Start Date", value=pd.to_datetime("2023-01-01"))
+    end_date = st.sidebar.date_input("End Date", value=pd.to_datetime("2028-12-31"))
+
+
+    @st.cache_data(ttl=3600)
+    def fetch_data(tickers, start, end):
+        return yf.download(tickers + [market_ticker], start=start, end=end)['Adj Close']
+
+    if selected_stocks:
+        st.write(f"Fetching data for {', '.join(selected_stocks)} from {start_date} to {end_date}...")
+        
+        try:
+            data = fetch_data(selected_stocks, start_date, end_date)
+            
+        
+            returns = data.pct_change().dropna()
+
+            def calculate_beta(stock_returns, market_returns):
+                slope, _, _, _, _ = linregress(market_returns, stock_returns)
+                return slope
+
+            results = []
+
+            for stock in selected_stocks:
+                beta = calculate_beta(returns[stock], returns[market_ticker])
+                percentage_change = (data[stock][-1] - data[stock][0]) / data[stock][0] * 100
+                results.append({'ticker': stock, 'beta value': beta, 'percentage_change': percentage_change})
+
+    
+            df = pd.DataFrame(results)
+
+    
+            df_sorted = df.sort_values(by='beta value').reset_index(drop=True)
+
+            
+            st.write("Sorted Beta Values and Percentage Change:")
+            st.dataframe(df_sorted)
+
+        except Exception as e:
+            st.error(f"An error occurred: {str(e)}")
+    else:
+        st.warning("Please select at least one stock.")
+
+    
+    
